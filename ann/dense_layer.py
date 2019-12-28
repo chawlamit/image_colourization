@@ -1,4 +1,4 @@
-from .base import HiddenLayer
+from .hidden_layer import HiddenLayer
 
 
 class Dense(HiddenLayer):

@@ -4,30 +4,36 @@ Activation functions for neural network layers
 from sympy import Symbol, lambdify, exp
 
 
-class Activation:
+def definition(symbols, func_def):
     """
-    base class for activation functions
-    Used as as argument for hidden layer
+    Helper functions to generate function from sympy function definition
     """
-    symbols = None
-    func_def = None
-
-    @classmethod
-    def func(cls):
-        return lambdify(cls.symbols, cls.func_def)
-
-    @classmethod
-    def prime(cls):
-        return lambdify(cls.symbols, cls.func_def.diff())
+    return lambdify(symbols, func_def)
 
 
-class Sigmoid(Activation):
+def derivative(symbols, func_def):
+    """
+    Helper functions to generate function derivative from sympy function definition
+    """
+    return lambdify(symbols, func_def.diff())
+
+
+class Sigmoid:
     x = Symbol('x')
-    symbols = (x, )
     func_def = 1 / (1 + exp(-x))
+
+    eval = definition(x, func_def)
+    prime = derivative(x, func_def) # sigma * (1 - sigma)
+
+
+class Linear:
+    x = Symbol('x')
+    func_def = x
+
+    eval = definition(x, func_def)
+    prime = derivative(x, func_def)
 
 
 if __name__ == '__main__':
-    sigmoid = Sigmoid.func()
-    sigmoid_prime = Sigmoid.prime()
-    print(sigmoid(-20))
+    sigmoid = Sigmoid
+    print(sigmoid.eval(-20))

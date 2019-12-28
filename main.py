@@ -1,81 +1,63 @@
-import keras
-from keras.models import Sequential
-from keras.layers import Dense
-from PIL import Image
+from ann.sequential_model import Sequential
+from ann.hidden_layer import HiddenLayer
+from ann.activation import Linear
 import json
-import requests
-from io import BytesIO
+from ann.image_operations import *
 import numpy as np
 
 
-def get_image_from_url(url):
-    """
-    returns PIL Image object from response
-    :param url:
-    :return:
-    """
-    response = requests.get(url, stream=True)
-    img_loc = Image.open(BytesIO(response.content))
-    return img_loc
+# global variables
+window_shape = (3, 3)
+row_margin = window_shape[0] // 2
+col_margin = window_shape[1] // 2
+
+x_data = []
+y_data = []
+with open('../dataset/forest_photos_info.json', 'r') as fo:
+    dataset = json.loads(fo.read())
+    for i, image_key in enumerate(dataset):
+        print(f"Processing Img: {i}")
+        img = get_image_from_url(dataset[image_key]['url'])
+        # img.show()
+        # input()
+        generate_data_set_from_image(img, x_data, y_data, window_shape)
+        if i == 10:
+            print(f"Generated data set from {i+1} images")
+            break
 
 
-def rgbToGray(rgb):
-    """
-    :param rgb: 1D np array consisting of RGB values of the pixel
-    :return: gray = 0.21r + 0.72g  + 0.07b
-    """
-    return np.dot(np.array([0.21, 0.72, 0.07]), rgb)
+def predict(model):
+    # test image
+    test_item = dataset.popitem()
+    img = get_image_from_url(test_item[1]['url'])
+    np_img = np.asarray(img)
+    img.show()
+
+    # gray scale
+    gray_img = 0.21 * np_img[:, :, 0] + 0.72 * np_img[:, :, 1] + 0.07 * np_img[:, :, 2]
+    gray_img = Image.fromarray(gray_img.astype(np.uint8))
+    gray_img.show()
+    # generate test data set
+    x_test, y_test = [], []
+    generate_data_set_from_image(img, x_test, y_test, window_shape)
+
+    out = model.predict(x_test, y_test)
+    np_out = np.zeros(np_img.shape - np.array([2, 2, 0]))
+    k = 0
+    for i in range(np_out.shape[0]):
+        for j in range(np_out.shape[1]):
+            np_out[i, j, ] = out[k] * 255
+            k += 1
+    out_img = Image.fromarray(np_out.astype(np.uint8))
+    out_img.show()
 
 
-def generate_data_set_from_image(image: Image, x_data, y_data, window_shape = (3, 3)):
-    """
-    Window dimensions are always assumed to be odd, i.e. we always have a middle element
-    """
-    arr = np.asarray(image)
-    n, m = arr.shape[0], arr.shape[1]
-    print("size", n, m)
+model = Sequential()
 
-    # base case: image must be larger than the window size
-    if n < window_shape[0] or m < window_shape[1]:
-        return None
+model.add(HiddenLayer(units=18, prev_layer_dim=9))
+model.add(HiddenLayer(units=9, prev_layer_dim=18))  # +1: bias node
+model.add(HiddenLayer(units=3, prev_layer_dim=9, activation=Linear, is_output=True))
 
-    row_margin = window_shape[0] // 2
-    col_margin = window_shape[1] // 2
-    for i in range(0 + row_margin, n - row_margin):
-        for j in range(0 + col_margin, m - col_margin):
-            data_pt = []
-            for x in range(i - row_margin, i + row_margin + 1):
-                for y in range(j - col_margin, j + col_margin + 1):
-                    rgb = arr[x, y, ] / 255
-                    # middle element of filter, to be used as output
-                    if x == i and y == j:
-                        y_data.append(rgb)
-                    data_pt.append(rgbToGray(rgb) / 255)
-            x_data.append(np.array(data_pt))
-    return x_data, y_data
+model.fit(x_data, y_data, rate=0.001, epoch=3)
 
-
-if __name__ == '__main__':
-    #  TODO - figure out why is this getting loaded from inside the ann folder
-    x_data = []
-    y_data = []
-    with open('dataset/ocean_photos_info.json', 'r') as fo:
-        print(fo)
-        oceans = json.loads(fo.read())
-        for i, image_key in enumerate(oceans):
-            print(f"Processing Img: {image_key}")
-            img = get_image_from_url(oceans[image_key]['url'])
-            # img.show()
-            # input()
-            generate_data_set_from_image(img, x_data, y_data)
-            if i == 10:
-                print("Stopping after ", i, "images")
-                break
-
-    model = Sequential()
-
-    model.add(Dense(12, input_dim=9, activation='sigmoid'))
-    model.add(Dense(8, activation='sigmoid'))
-    model.add(Dense(3))
-
-    model.compile(loss='mean_squared_error', optimizer='adam', metrics=['accuracy'])
+predict(model)
