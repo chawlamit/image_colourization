@@ -16,7 +16,7 @@ class Loss(ABC):
     def grad(self, out_hat, out):
         if out_hat.shape != out.shape:
             raise Exception(f"y_hat({out_hat.shape}) and y({out.shape}) have different shapes")
-        return np.mean(self.prime(out_hat, out), axis=0).squeeze()
+        return np.mean(self.prime(out_hat, out) / out.size, axis=0).squeeze()
 
 
 class MSE(Loss):

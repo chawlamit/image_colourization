@@ -39,22 +39,27 @@ class Linear(Layer):
         # print(self._input.shape, self.W.shape)
         return np.matmul(self._input, self.W) # 100,3 X 3, 2 = 100, 2
 
-    def back_prop(self, dl_dy): # (2, )
+    def back_prop(self, dl_dy, lr): # (2, )
         """
         :param dl_dy: out_dim
         calculates dL/dw and back return dL/dx for back prop
         Also capable of calculating loss' for the single given unit index
         """
-        size = self._input.shape[0] # 100
-        out = self.forward(self._input) # (100, 2)
+        # size = self._input.shape[0] # 100
+        # out = self.forward(self._input) # (100, 2)
+        #
+        # _input = self._input.reshape(-1, 1) # (300, 1)
+        # self.grad = np.matmul(_input, dl_dy.reshape(1, -1)) # (1, 2)
+        # # print("Grad:", self.grad.shape)
+        # self.grad = np.split(self.grad, size)
+        # self.grad = np.mean(self.grad, axis=0) # make it tensor of shape (size, in_dim, out_dim)
+        # # print(self.grad)
+        # return np.dot(self.W, dl_dy).squeeze()
 
-        _input = self._input.reshape(-1, 1) # (300, 1)
-        self.grad = np.matmul(_input, dl_dy.reshape(1, -1)) # (1, 2)
-        # print("Grad:", self.grad.shape)
-        self.grad = np.split(self.grad, size)
-        self.grad = np.mean(self.grad, axis=0) # make it tensor of shape (size, in_dim, out_dim)
-        # print(self.grad)
-        return np.dot(self.W, dl_dy).squeeze()
+        self.grad = np.dot(self._input[:, :-1].T, dl_dy)
+        self.W[:-1, :] -= lr * self.grad
+        self.W[-1, :] -= (lr * dl_dy).squeeze()
+        return np.dot(dl_dy, self.W[:-1, :].T)
 
     def update(self, lr):
         """

@@ -47,6 +47,25 @@ class ReLU(Layer):
     def __str__(self):
         return str(__class__)
 
+class Tanh(Layer):
+
+    def __init__(self):
+        self._input = None
+        self.grad = None
+
+    def forward(self, _input):
+        self._input = _input
+        return np.tanh(self._input)
+
+    def back_prop(self, dl_dy, lr):
+        # gradient = self.prime(self._input)
+        # out = np.mean(np.multiply(gradient, dl_dy), axis=0)
+        return (1 - np.tanh(self._input) ** 2) * dl_dy
+        # return out
+
+    def __str__(self):
+        return str(__class__)
+
 
 class Softmax(Layer):
     def __init__(self):

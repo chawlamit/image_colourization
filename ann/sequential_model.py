@@ -30,11 +30,11 @@ class Sequential:
             _input = layer.forward(_input)
         return _input
 
-    def back_prop(self, dl_dy):
+    def back_prop(self, dl_dy, lr):
         for layer in self.layers[::-1]:
-            dl_dy = layer.back_prop(dl_dy)
-            if isinstance(layer, Linear):
-                dl_dy = dl_dy[1:]
+            dl_dy = layer.back_prop(dl_dy, lr)
+            # if isinstance(layer, Linear):
+            #     dl_dy = dl_dy[1:]
         return dl_dy
 
     def update(self, lr):
@@ -62,22 +62,34 @@ class Sequential:
         if batch_size == 0:  # use entire dataset
             batch_size = x_train.shape[0]
         iterations = x_train.shape[0] // batch_size
-        with tqdm(total=epoch * batch_size) as pbar:
+        # with tqdm(total=epoch * batch_size) as pbar:
+        #     # log.info(f"Training iterations: {iterations}")
+        #     for ep in range(epoch):
+        #         for i in range(iterations):
+        #             batch = x_train[i * batch_size: (i + 1) * batch_size]
+        #             y = y_train[i * batch_size: (i + 1) * batch_size]
+        #             y_hat = self.forward(batch)
+        #             # print(y_hat)
+        #             # time.sleep(1)
+        #             # dL/dy vector at output layers
+        #             dl_dy = loss.grad(y_hat, y)
+        #             # back propagate the error
+        #             self.back_prop(dl_dy)
+        #             # update the parameters using the calculated gradient
+        #             self.update(lr=lr)
+        #
+        #             pbar.update(1)
+        #             pbar.set_description(
+        #                 f"{ep},{i} => Avg loss: {loss.loss(y_hat, y)}")
+
+        with tqdm(total=epoch * x_train.shape[0]) as pbar:
             # log.info(f"Training iterations: {iterations}")
             for ep in range(epoch):
-                for i in range(iterations):
-                    batch = x_train[i * batch_size: (i + 1) * batch_size]
-                    y = y_train[i * batch_size: (i + 1) * batch_size]
-                    y_hat = self.forward(batch)
-                    # print(y_hat)
-                    # time.sleep(1)
-                    # dL/dy vector at output layers
+                for i in range(x_train.shape[0]):
+                    y = y_train[i]
+                    y_hat = self.forward(x_train[i])
                     dl_dy = loss.grad(y_hat, y)
-                    # back propagate the error
-                    self.back_prop(dl_dy)
-                    # update the parameters using the calculated gradient
-                    self.update(lr=lr)
-
+                    self.back_prop(dl_dy, lr)
                     pbar.update(1)
                     pbar.set_description(
                         f"{ep},{i} => Avg loss: {loss.loss(y_hat, y)}")
