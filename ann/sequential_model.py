@@ -1,85 +1,106 @@
 """
 Dense Sequential Neural Network Model
 """
-from ann.hidden_layer import HiddenLayer
-from ann.activation import Linear
-from ann.loss_functions import MSE
+from ann.activations import Sigmoid, ReLU
+from ann.linear import Linear
+from ann.losses import MSE, Loss, BCE
 import numpy as np
 from tqdm import tqdm
+import sys
+import logging
+import time
+
+FORMAT = '[%(levelname)s: %(filename)s: %(lineno)4d]: %(message)s'
+logging.basicConfig(level=logging.INFO, format=FORMAT, stream=sys.stdout)
+log = logging.getLogger(__name__)
 
 
 class Sequential:
-    def __init__(self):
-        self.layers = []
+    def __init__(self, layers=None):
+        if layers is None:
+            layers = []
+        self.layers = layers
 
-    def add(self, layer: HiddenLayer):
+    def add(self, layer):
         layer.initialize()
         self.layers.append(layer)
 
-    def fit(self, x_train, y_train, epoch=10, loss=MSE, batch_size=10, rate=0.001):
+    def forward(self, _input):
+        for layer in self.layers:
+            _input = layer.forward(_input)
+        return _input
+
+    def back_prop(self, dl_dy):
+        for layer in self.layers[::-1]:
+            dl_dy = layer.back_prop(dl_dy)
+            if isinstance(layer, Linear):
+                dl_dy = dl_dy[1:]
+        return dl_dy
+
+    def update(self, lr):
         """
-        Train the neural network model
+        :param lr: learning rate
+        """
+        for layer in self.layers[::-1]:
+            try:
+                getattr(layer, 'W')
+                layer.update(lr)
+            except AttributeError:
+                continue
+
+    def train(self, x_train, y_train, loss: Loss, epoch=100, batch_size=64, lr=1e-4):
+        """
+        Train the neural network model using Batch Gradient Descent
         :param epoch:
-        :param rate:
+        :param lr: learning rate
         :param x_train: (n, input_features)
         :param y_train: (last_layer_size, 1)
         :param loss: loss function used to train the model
         :param batch_size: No. of data points used in for batch gradient descent
         :return: None
         """
-        # TODO - learn bias
-        with tqdm(total=epoch * len(x_train)) as pbar:
+        if batch_size == 0:  # use entire dataset
+            batch_size = x_train.shape[0]
+        iterations = x_train.shape[0] // batch_size
+        with tqdm(total=epoch * batch_size) as pbar:
+            # log.info(f"Training iterations: {iterations}")
             for ep in range(epoch):
-                for pt_i in range(len(x_train)):
-                    data_pt = x_train[pt_i]
-                    _out = data_pt
-                    out_layer_wise = [_out]
-                    for hl in self.layers:
-                        _out = hl.out(_out)
-                        out_layer_wise.append(_out)
-                    # dL/dout vector at output layers
-                    loss_prime_t = loss.prime(_out, y_train[pt_i])
-                    # Let's modify the wirghts and back-prop the error
-                    for t in range(len(self.layers)-1, -1, -1):
-                        hl = self.layers[t]
-                        # i, j - node i in layer t-1 to j in t
-                        sigma_prime = self.layers[t].prime(out_layer_wise[t])
-                        self.layers[t].W = self.layers[t].W - rate * np.matmul(
-                            np.reshape((loss_prime_t * sigma_prime), (self.layers[t].units, 1)),
-                            np.reshape(out_layer_wise[t], (1, hl.prev_layer_dim)))
+                for i in range(iterations):
+                    batch = x_train[i * batch_size: (i + 1) * batch_size]
+                    y = y_train[i * batch_size: (i + 1) * batch_size]
+                    y_hat = self.forward(batch)
+                    # print(y_hat)
+                    # time.sleep(1)
+                    # dL/dy vector at output layers
+                    dl_dy = loss.grad(y_hat, y)
+                    # back propagate the error
+                    self.back_prop(dl_dy)
+                    # update the parameters using the calculated gradient
+                    self.update(lr=lr)
 
-                        loss_prime_t = np.matmul(
-                            (loss_prime_t * self.layers[t].prime(out_layer_wise[t])),
-                            self.layers[t].W)
+                    pbar.update(1)
+                    pbar.set_description(
+                        f"{ep},{i} => Avg loss: {loss.loss(y_hat, y)}")
 
-                    pbar.update()
-                    pbar.set_description(f"epoch: {ep+1}, pt: {pt_i}, Avg loss: {np.sum(loss.eval(_out, y_train[pt_i]))}")
-
-    def predict(self, x_test, y_test=None, loss=MSE):
-        out = []
-        error = []
-        for pt_i, data_pt in enumerate(x_test):
-            _out = data_pt
-            for hl in self.layers:
-                _out = hl.out(_out)
-            if y_test:
-                _error = np.sum(loss.eval(_out, y_test[pt_i]))
-            out.append(_out)
-            if y_test:
-                error.append(_error)
-        if y_test:
-            print("Average Loss: ", np.mean(error))
-        return out
+    def __str__(self):
+        return f"{__class__}: \n {[str(layer) for layer in self.layers]}"
 
 
 if __name__ == '__main__':
     model = Sequential()
-    model.add(HiddenLayer(units=18, prev_layer_dim=9))
-    model.add(HiddenLayer(units=9, prev_layer_dim=18))
-    model.add(HiddenLayer(units=3, prev_layer_dim=9, activation=Linear, is_output=True))
+    model.add(Linear(in_dim=2, out_dim=2))
+    model.add(Sigmoid())
+    # model.add(Linear(in_dim=2, out_dim=2))
+    # model.add(Sigmoid())
+    model.add(Linear(in_dim=2, out_dim=1))
+    model.add(Sigmoid())
 
-    x_data = [np.array([i for i in range(9)])]
-    y_data = [np.array([1, 2, 3])]
-    model.fit(x_data, y_data)
+    data = np.array([[-1, -1], [-1, 1], [1, 1], [1, -1]])
+    x_data = data
+    y_data = np.array([1, -1, 1, -1]).reshape(4, 1)
 
-    print("out", model.predict(x_data, y_data))
+    print(model)
+    # print("grad", model.back_prop(np.array([0.5, 0.4, 0.3])))
+    bce = BCE()
+    model.train(x_data, y_data, loss=bce, epoch=2, batch_size=4)
+    print("out", model.forward(x_data))

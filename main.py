@@ -1,6 +1,7 @@
+from ann.losses import MSE
 from ann.sequential_model import Sequential
-from ann.hidden_layer import HiddenLayer
-from ann.activation import Linear
+from ann.linear import Linear
+from ann.activations import Sigmoid
 import json
 from ann.image_operations import *
 import numpy as np
@@ -11,25 +12,30 @@ window_shape = (3, 3)
 row_margin = window_shape[0] // 2
 col_margin = window_shape[1] // 2
 
-x_data = []
-y_data = []
-with open('../dataset/forest_photos_info.json', 'r') as fo:
-    dataset = json.loads(fo.read())
-    for i, image_key in enumerate(dataset):
-        print(f"Processing Img: {i}")
-        img = get_image_from_url(dataset[image_key]['url'])
-        # img.show()
-        # input()
-        generate_data_set_from_image(img, x_data, y_data, window_shape)
-        if i == 10:
-            print(f"Generated data set from {i+1} images")
-            break
+
+def train(model):
+    x_data = []
+    y_data = []
+    with open('./dataset/mountain_photos_info.json', 'r') as fo:
+        dataset = json.loads(fo.read())
+        for i, image_key in enumerate(dataset):
+            print(f"Processing Img: {i}")
+            try:
+                img = get_image_from_url(dataset[image_key]['url'])
+            except Exception:
+                continue
+            # img.show()
+            # input()
+            generate_data_set_from_image(img, x_data, y_data, window_shape)
+            model.train(np.array(x_data), np.array(y_data), loss=MSE(), epoch=2, lr=5e-6, batch_size=100)
+            x_data, y_data = [], []
+            if (i+1) % 10 == 0:
+                validate(model, dataset, image_key)
 
 
-def predict(model):
+def validate(model, dataset, image_key):
     # test image
-    test_item = dataset.popitem()
-    img = get_image_from_url(test_item[1]['url'])
+    img = get_image_from_url(dataset[image_key]['url'])
     np_img = np.asarray(img)
     img.show()
 
@@ -41,7 +47,7 @@ def predict(model):
     x_test, y_test = [], []
     generate_data_set_from_image(img, x_test, y_test, window_shape)
 
-    out = model.predict(x_test, y_test)
+    out = model.forward(np.array(x_test))
     np_out = np.zeros(np_img.shape - np.array([2, 2, 0]))
     k = 0
     for i in range(np_out.shape[0]):
@@ -52,12 +58,22 @@ def predict(model):
     out_img.show()
 
 
-model = Sequential()
+def main():
+    model = Sequential()
 
-model.add(HiddenLayer(units=18, prev_layer_dim=9))
-model.add(HiddenLayer(units=9, prev_layer_dim=18))  # +1: bias node
-model.add(HiddenLayer(units=3, prev_layer_dim=9, activation=Linear, is_output=True))
+    model.add(Linear(in_dim=9, out_dim=18))
+    model.add(Sigmoid())
+    model.add(Linear(in_dim=18, out_dim=36))
+    model.add(Sigmoid())
+    model.add(Linear(in_dim=36, out_dim=18))
+    model.add(Sigmoid())
+    model.add(Linear(in_dim=18, out_dim=9))
+    model.add(Sigmoid())
+    model.add(Linear(in_dim=9, out_dim=3))
 
-model.fit(x_data, y_data, rate=0.001, epoch=3)
+    train(model)
+    validate(model)
 
-predict(model)
+
+if __name__ == '__main__':
+    main()
