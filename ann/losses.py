@@ -1,6 +1,5 @@
 from abc import ABC
 import numpy as np
-from sympy import Symbol, lambdify, log
 
 
 class Loss(ABC):
@@ -20,28 +19,33 @@ class Loss(ABC):
 
 
 class MSE(Loss):
+    """
+    || y_hat - y ||
+    returns (size, y_dim)
+    """
     def __init__(self):
         super().__init__()
-        a = Symbol('a')
-        b = Symbol('b')
-        func_def = ((a - b) ** 2)
-        func_diff = 2 * (a - b)
+    
+    def loss(self, y_hat, y):
+        return np.sum((y_hat - y)**2, axis=1)
+    
+    def grad(self, y_hat, y):
+        return 2 * (y_hat - y)
 
-        self.eval = lambdify((a, b), func_def)
-        self.prime = lambdify((a, b), func_diff)
 
-
+    
+# Not Working, check why    
 class BCE(Loss):
     def __init__(self):
         super().__init__()
-        a = Symbol('a')
-        b = Symbol('b')
-        func_def = -b * log(a) - (1 - b) * log(1 - a)
-        func_diff = a - b
-
-        self.eval = lambdify((a, b), func_def)
-        self.prime = lambdify((a, b), func_diff)
-
+        
+    def loss(self, y_hat, y):
+        return np.mean(-1*(y * np.log(y_hat) + (1-y)*np.log(1-y_hat)), axis=0)
+    
+    def grad(self, y_hat, y):
+        return np.mean(-1 * (y - y_hat)/(y_hat * (1 - y_hat)), axis=0)
+#         return y_hat - y
+        
 
 class CCE(Loss):
     def __init__(self):

@@ -11,5 +11,5 @@ class Layer(ABC):
     def forward(self, _input):
         pass
 
-    def back_prop(self, dl_dy):
+    def back_prop(self, dl_dy, lr):
         pass
